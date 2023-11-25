@@ -88,6 +88,48 @@ func NewMyServer() *myServer {
 	return &myServer{}
 }
 
+func unaryLogging() grpc.UnaryServerInterceptor {
+	return func (ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		log.Println("[pre] my unary server interceptor 1: ", info.FullMethod) // ハンドラの前に割り込ませる前処理
+		res, err := handler(ctx, req) // 本来の処理
+		log.Println("[post] my unary server interceptor 1: ", res) // ハンドラの後に割り込ませる後処理
+		return res, err
+	}
+}
+
+func streamLogging() grpc.StreamServerInterceptor {
+	return func (srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		// ストリームがopenされたときに行われる前処理
+		log.Println("[pre stream] my stream server interceptor 1: ", info.FullMethod)
+
+		err := handler(srv, &myServerStreamWrapper1{ss}) // 本来のストリーム処理
+
+		// ストリームがcloseされるときに行われる後処理
+		log.Println("[post stream] my stream server interceptor 1: ")
+		return err
+	}
+}
+
+type myServerStreamWrapper1 struct {
+	grpc.ServerStream
+}
+
+func (s *myServerStreamWrapper1) RecvMsg(m interface{}) error {
+	// ストリームから、リクエストを受信
+	err := s.ServerStream.RecvMsg(m)
+	// 受信したリクエストを、ハンドラで処理する前に差し込む前処理
+	if !errors.Is(err, io.EOF) {
+		log.Println("[pre message] my stream server interceptor 1: ", m)
+	}
+	return err
+}
+
+func (s *myServerStreamWrapper1) SendMsg(m interface{}) error {
+	// ハンドラで作成したレスポンスを、ストリームから返信する直前に差し込む後処理
+	log.Println("[post message] my stream server interceptor 1: ", m)
+	return s.ServerStream.SendMsg(m)
+}
+
 func main() {
 	// 1. 8080番portのLisnterを作成
 	port := 8081
@@ -97,7 +139,7 @@ func main() {
 	}
 
 	// 2. gRPCサーバーを作成
-	s := grpc.NewServer()
+	s := grpc.NewServer(grpc.StreamInterceptor(streamLogging()))
 
 	// 3. gRPCサーバーにGreetingServiceを登録
 	hellopb.RegisterGreetingServiceServer(s, NewMyServer())
