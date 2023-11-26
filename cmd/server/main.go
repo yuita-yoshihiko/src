@@ -87,29 +87,6 @@ func (s *myServer) HelloBiStreams(stream hellopb.GreetingService_HelloBiStreamsS
 func NewMyServer() *myServer {
 	return &myServer{}
 }
-
-func unaryLogging() grpc.UnaryServerInterceptor {
-	return func (ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		log.Println("[pre] my unary server interceptor 1: ", info.FullMethod) // ハンドラの前に割り込ませる前処理
-		res, err := handler(ctx, req) // 本来の処理
-		log.Println("[post] my unary server interceptor 1: ", res) // ハンドラの後に割り込ませる後処理
-		return res, err
-	}
-}
-
-func streamLogging() grpc.StreamServerInterceptor {
-	return func (srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		// ストリームがopenされたときに行われる前処理
-		log.Println("[pre stream] my stream server interceptor 1: ", info.FullMethod)
-
-		err := handler(srv, &myServerStreamWrapper1{ss}) // 本来のストリーム処理
-
-		// ストリームがcloseされるときに行われる後処理
-		log.Println("[post stream] my stream server interceptor 1: ")
-		return err
-	}
-}
-
 type myServerStreamWrapper1 struct {
 	grpc.ServerStream
 }

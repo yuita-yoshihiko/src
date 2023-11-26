@@ -20,51 +20,6 @@ var (
 	client  hellopb.GreetingServiceClient
 )
 
-func myUnaryClientInteceptor1(ctx context.Context, method string, req, res interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-	fmt.Println("[pre] my unary client interceptor 1", method, req) // リクエスト送信前に割り込ませる前処理
-	err := invoker(ctx, method, req, res, cc, opts...) // 本来のリクエスト
-	fmt.Println("[post] my unary client interceptor 1", res) // リクエスト送信後に割り込ませる後処理
-	return err
-}
-
-func myStreamClientInteceptor1(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
-	// ストリームがopenされる前に行われる前処理
-	log.Println("[pre] my stream client interceptor 1", method)
-
-	stream, err := streamer(ctx, desc, cc, method, opts...)
-	return &myClientStreamWrapper1{stream}, err
-}
-
-type myClientStreamWrapper1 struct {
-	grpc.ClientStream
-}
-
-func (s *myClientStreamWrapper1) SendMsg(m interface{}) error {
-	// リクエスト送信前に割り込ませる処理
-	log.Println("[pre message] my stream client interceptor 1: ", m)
-
-	// リクエスト送信
-	return s.ClientStream.SendMsg(m)
-}
-
-func (s *myClientStreamWrapper1) RecvMsg(m interface{}) error {
-	err := s.ClientStream.RecvMsg(m) // レスポンス受信処理
-
-	// レスポンス受信後に割り込ませる処理
-	if !errors.Is(err, io.EOF) {
-		log.Println("[post message] my stream client interceptor 1: ", m)
-	}
-	return err
-}
-
-func (s *myClientStreamWrapper1) CloseSend() error {
-	err := s.ClientStream.CloseSend() // ストリームをclose
-
-	// ストリームがcloseされた後に行われる後処理
-	log.Println("[post] my stream client interceptor 1")
-	return err
-}
-
 func main() {
 	fmt.Println("start gRPC Client.")
 
